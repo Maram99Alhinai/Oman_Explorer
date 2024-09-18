@@ -5,4 +5,8 @@ Python 3.11.4
 
 Set_up steps :
 - python -m venv omanexplor
--  omanexplor\Scripts\activate
+- omanexplor\Scripts\activate
+- pip install -r requirements.txt
+
+Steps to run:
+- Python main.py
