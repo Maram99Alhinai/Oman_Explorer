@@ -1,6 +1,7 @@
 from flask import Flask
 from app.config import load_configurations, configure_logging
 from .views import webhook_blueprint
+from .services.db_service import init_db
 
 
 def create_app():
@@ -9,6 +10,9 @@ def create_app():
     # Load configurations and logging settings
     load_configurations(app)
     configure_logging()
+    
+    # Initialize database
+    init_db(app)
 
     # Import and register blueprints, if any
     app.register_blueprint(webhook_blueprint)
