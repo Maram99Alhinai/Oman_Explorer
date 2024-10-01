@@ -40,21 +40,18 @@ def init_db(app):
         inspector = inspect(db.engine)
         existing_tables = inspector.get_table_names()
         
-        # Check if our tables already exist
-        tables_to_create = []
-        for table in [User, TravelDestination, Preference]:
-            if table.__tablename__ not in existing_tables:
-                tables_to_create.append(table)
+        # List of all our models
+        models = [User, TravelDestination, Preference]
         
-        if tables_to_create:
-            try:
-                # Only create tables that don't exist
-                db.create_all(tables=tables_to_create)
-                print(f"Created tables: {', '.join(table.__tablename__ for table in tables_to_create)}")
-            except Exception as e:
-                print(f"Error creating tables: {e}")
-        else:
-            print("All tables already exist. No new tables were created.")
+        for model in models:
+            if model.__tablename__ not in existing_tables:
+                try:
+                    model.__table__.create(db.engine)
+                    print(f"Created table: {model.__tablename__}")
+                except Exception as e:
+                    print(f"Error creating table {model.__tablename__}: {e}")
+            else:
+                print(f"Table {model.__tablename__} already exists")
 
 # You can add other database-related functions here, such as:
 # - Functions to add sample data
