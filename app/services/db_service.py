@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
+from sqlalchemy import inspect
 
 db = SQLAlchemy()
 
@@ -34,8 +35,28 @@ class Preference(db.Model):
 
 def init_db(app):
     db.init_app(app)
+    
     with app.app_context():
-        try:
-            db.create_all()
-        except Exception as e:
-            print(f"Error creating database: {e}")
+        inspector = inspect(db.engine)
+        existing_tables = inspector.get_table_names()
+        
+        # Check if our tables already exist
+        tables_to_create = []
+        for table in [User, TravelDestination, Preference]:
+            if table.__tablename__ not in existing_tables:
+                tables_to_create.append(table)
+        
+        if tables_to_create:
+            try:
+                # Only create tables that don't exist
+                db.create_all(tables=tables_to_create)
+                print(f"Created tables: {', '.join(table.__tablename__ for table in tables_to_create)}")
+            except Exception as e:
+                print(f"Error creating tables: {e}")
+        else:
+            print("All tables already exist. No new tables were created.")
+
+# You can add other database-related functions here, such as:
+# - Functions to add sample data
+# - Functions to query or update data
+# - Any other database utility functions

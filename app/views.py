@@ -1,13 +1,10 @@
 import logging
 import json
-
 from flask import Blueprint, request, jsonify, current_app
-
 from .decorators.security import signature_required
-from .utils.whatsapp_utils import (
-    process_whatsapp_message,
-    is_valid_whatsapp_message,
-)
+from .utils.whatsapp_utils import (process_whatsapp_message,is_valid_whatsapp_message,)
+
+
 
 webhook_blueprint = Blueprint("webhook", __name__)
 
@@ -80,6 +77,7 @@ def verify():
 @webhook_blueprint.route("/webhook", methods=["GET"])
 def webhook_get():
     return verify()
+
 
 @webhook_blueprint.route("/webhook", methods=["POST"])
 @signature_required
