@@ -65,7 +65,20 @@ def process_whatsapp_message(body):
     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    message_body = message["text"]["body"]
+    
+    # Handle different types of messages
+    if "location" in message:
+        location = message["location"]
+        # Create a location message for the OpenAI assistant
+        # Create a location message in Arabic for the OpenAI assistant
+        message_body = f"""موقعي الحالي هو:
+                خط العرض: {location['latitude']}
+                خط الطول: {location['longitude']} """
+    elif "text" in message:
+        message_body = message["text"]["body"]
+    else:
+        message_body = "I can handle text messages and locations. Please send either of those."
+
 
     # Generate response using OpenAI
     response = generate_response(message_body, wa_id, name)
@@ -120,11 +133,14 @@ def extract_user_data(response):
 
 
 def is_valid_whatsapp_message(body):
-    return (
-        body.get("object")
-        and body.get("entry")
-        and body["entry"][0].get("changes")
-        and body["entry"][0]["changes"][0].get("value")
-        and body["entry"][0]["changes"][0]["value"].get("messages")
-        and body["entry"][0]["changes"][0]["value"]["messages"][0]
-    )
+    """Extended validation to include location messages"""
+    if not (body.get("object") and body.get("entry") and 
+            body["entry"][0].get("changes") and 
+            body["entry"][0]["changes"][0].get("value") and 
+            body["entry"][0]["changes"][0]["value"].get("messages") and 
+            body["entry"][0]["changes"][0]["value"]["messages"][0]):
+        return False
+        
+    message = body["entry"][0]["changes"][0]["value"]["messages"][0]
+    # Check if it's a text or location message
+    return "text" in message or "location" in message
