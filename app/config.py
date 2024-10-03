@@ -18,7 +18,7 @@ def load_configurations(app):
     app.config["VERIFY_TOKEN"] = os.getenv("VERIFY_TOKEN")
     
     # Database Config
-    app.config['DB_USER'] = os.environ.get('DB_USER', 'root')
+    app.config['DB_USER'] = os.environ.get('DB_USER', 'maram')
     app.config['DB_PASS'] = os.environ.get('DB_PASS')
     app.config['DB_NAME'] = os.environ.get('DB_NAME', 'sohail_db')
     app.config['DB_HOST'] = os.environ.get('DB_HOST')  

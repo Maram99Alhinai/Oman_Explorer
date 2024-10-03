@@ -2,7 +2,12 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy import inspect
 
+
+
 db = SQLAlchemy()
+
+
+
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -52,6 +57,7 @@ def init_db(app):
                     print(f"Error creating table {model.__tablename__}: {e}")
             else:
                 print(f"Table {model.__tablename__} already exists")
+                
 
 # You can add other database-related functions here, such as:
 # - Functions to add sample data
