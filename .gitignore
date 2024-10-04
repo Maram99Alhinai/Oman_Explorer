@@ -169,3 +169,6 @@ data/
 *.dir
 *.dat
 *.bak
+
+# Docker
+.docker/
