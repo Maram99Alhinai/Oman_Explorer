@@ -11,35 +11,16 @@ OPENAI_ASSISTANT_ID = os.getenv("OPENAI_ASSISTANT_ID")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-def upload_file(path):
-    # Upload a file with an "assistants" purpose
-    file = client.files.create(
-        file=open("../../data/airbnb-faq.pdf", "rb"), purpose="assistants"
-    )
-
-
-def create_assistant(file):
-    """
-    You currently cannot set the temperature for Assistant via the API.
-    """
-    assistant = client.beta.assistants.create(
-        name="WhatsApp AirBnb Assistant",
-        instructions="You're a helpful WhatsApp assistant that can assist guests that are staying in our Paris AirBnb. Use your knowledge base to best respond to customer queries. If you don't know the answer, say simply that you cannot help with question and advice to contact the host directly. Be friendly and funny.",
-        tools=[{"type": "retrieval"}],
-        model="gpt-4-1106-preview",
-        file_ids=[file.id],
-    )
-    return assistant
 
 
 # Use context manager to ensure the shelf file is closed properly
 def check_if_thread_exists(wa_id):
-    with shelve.open("threads_db") as threads_shelf:
+    with shelve.open("data/threads_db") as threads_shelf:
         return threads_shelf.get(wa_id, None)
 
 
 def store_thread(wa_id, thread_id):
-    with shelve.open("threads_db", writeback=True) as threads_shelf:
+    with shelve.open("data/threads_db", writeback=True) as threads_shelf:
         threads_shelf[wa_id] = thread_id
 
 
