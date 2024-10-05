@@ -172,3 +172,4 @@ data/
 
 # Docker
 .docker/
+/credentials
