@@ -26,6 +26,10 @@ RUN wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O /usr/loca
 # Create necessary directories
 RUN mkdir -p /app/data /app/credentials
 
+# Set the environment variable to point to the credentials
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/google-credentials.json
+ENV NGROK_AUTHTOKEN=2ZClMk1RNjhnRQpbMgrUu8RxFYq_4rbMPnzsuaSjD2Za2169c
+
 # Copy application code
 COPY . .
 
