@@ -34,7 +34,7 @@ wait_for_service localhost 3307 "Cloud SQL Proxy" 30 || exit 1
 echo "Configuring ngrok..."
 if [ -n "$NGROK_AUTHTOKEN" ]; then
     ngrok config add-authtoken "$NGROK_AUTHTOKEN"
-    ngrok http 8000 --domain=adapting-moccasin-vastly.ngrok-free.app &
+    ngrok http 8080 --domain=adapting-moccasin-vastly.ngrok-free.app &
     NGROK_PID=$!
 else
     echo "Warning: NGROK_AUTHTOKEN not set. Skipping ngrok setup."
@@ -45,7 +45,7 @@ sleep 2
 
 # Start Gunicorn application server
 echo "Starting Gunicorn..."
-gunicorn --workers 4 --worker-class gevent --bind 0.0.0.0:8000 main:app &
+gunicorn --workers 4 --worker-class gevent --bind 0.0.0.0:8080 main:app &
 GUNICORN_PID=$!
 
 # Trap SIGTERM and SIGINT
