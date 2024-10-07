@@ -5,6 +5,11 @@ import requests
 from app.services.openai_service import generate_response
 import re
 from app.utils.db_utils import save_user_info, save_user_preference
+from collections import deque
+
+
+# A deque to store recently processed message IDs
+processed_messages = deque(maxlen=100)  
 
 
 
@@ -61,49 +66,44 @@ def process_text_for_whatsapp(text):
 
 # Modify your process_whatsapp_message function
 def process_whatsapp_message(body):
+    message_id = body["entry"][0]["changes"][0]["value"]["messages"][0]["id"]
+    
+     # Check if the message has already been processed
+    if is_message_processed(message_id):
+        logging.info(f"Message {message_id} already processed. Skipping.")
+        return
+
+    # Mark the message as processed
+    mark_message_as_processed(message_id)
+
+    # Add the message ID to the deque
+    processed_messages.append(message_id)
+
+    # Process the message (as before)
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
-
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    
-    # Handle different types of messages
+
+    # Handle message types (text, location, etc.)
     if "location" in message:
         location = message["location"]
-        # Create a location message for the OpenAI assistant
-        # Create a location message in Arabic for the OpenAI assistant
         message_body = f"""موقعي الحالي هو:
-                خط العرض: {location['latitude']}
-                خط الطول: {location['longitude']} """
+            خط العرض: {location['latitude']}
+            خط الطول: {location['longitude']} """
     elif "text" in message:
         message_body = message["text"]["body"]
     else:
         message_body = "I can handle text messages and locations. Please send either of those."
 
-
     # Generate response using OpenAI
     response = generate_response(message_body, wa_id, name)
-    
-    # Process the response to extract user information and preferences
-    user_info, preferences = extract_user_data(response)
-    
-    # Save user information
-    if user_info:
-        save_user_info(wa_id, name, user_info.get('age'), user_info.get('gender'), 
-                       user_info.get('state'), user_info.get('travel_style'))
-    else:
-        save_user_info(wa_id)
-    
-    # Save user preferences
-    if preferences:
-        for pref in preferences:
-            save_user_preference(wa_id, pref['destination'], pref['style'], pref['tags'])
 
-    # Process the response for WhatsApp formatting
+    # Process and send the response as before
     response = process_text_for_whatsapp(response)
-
-    # Send the message
     data = get_text_message_input(wa_id, response)
     send_message(data)
+    
+    
 
 def extract_user_data(response):
     # Implement logic to extract user information and preferences from the AI response
@@ -144,3 +144,12 @@ def is_valid_whatsapp_message(body):
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
     # Check if it's a text or location message
     return "text" in message or "location" in message
+
+
+def is_message_processed(message_id):
+    with shelve.open("data/processed_messages_db") as processed_shelf:
+        return processed_shelf.get(message_id, False)
+
+def mark_message_as_processed(message_id):
+    with shelve.open("data/processed_messages_db", writeback=True) as processed_shelf:
+        processed_shelf[message_id] = True

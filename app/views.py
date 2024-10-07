@@ -1,9 +1,9 @@
 import logging
 import json
+import threading
 from flask import Blueprint, request, jsonify, current_app
 from .decorators.security import signature_required
-from .utils.whatsapp_utils import (process_whatsapp_message,is_valid_whatsapp_message,)
-
+from .utils.whatsapp_utils import (process_whatsapp_message, is_valid_whatsapp_message)
 
 
 webhook_blueprint = Blueprint("webhook", __name__)
@@ -24,7 +24,6 @@ def handle_message():
         response: A tuple containing a JSON response and an HTTP status code.
     """
     body = request.get_json()
-    # logging.info(f"request body: {body}")
 
     # Check if it's a WhatsApp status update
     if (
@@ -42,16 +41,41 @@ def handle_message():
             return jsonify({"status": "ok"}), 200
         else:
             # if the request is not a WhatsApp API event, return an error
-            return (
-                jsonify({"status": "error", "message": "Not a WhatsApp API event"}),
-                404,
-            )
+            return jsonify({"status": "error", "message": "Not a WhatsApp API event"}), 404
     except json.JSONDecodeError:
         logging.error("Failed to decode JSON")
         return jsonify({"status": "error", "message": "Invalid JSON provided"}), 400
 
 
-# Required webhook verifictaion for WhatsApp
+def handle_message_async(body):
+    """
+    This function runs in a separate thread to process incoming WhatsApp messages asynchronously.
+    """
+    process_whatsapp_message(body)
+
+
+@webhook_blueprint.route("/webhook", methods=["POST"])
+@signature_required
+def webhook_post():
+    """
+    Handles incoming POST requests from the WhatsApp API webhook.
+
+    It processes the message asynchronously by spawning a new thread for message processing.
+    This ensures that the response to WhatsApp is immediate while the message is processed in the background.
+
+    Returns:
+        response: A JSON response with status 200 to WhatsApp to acknowledge the receipt.
+    """
+    body = request.get_json()
+
+    # Respond with 200 immediately, then process the message in a background thread
+    thread = threading.Thread(target=handle_message_async, args=(body,))
+    thread.start()
+
+    return jsonify({"status": "ok"}), 200
+
+
+# Required webhook verification for WhatsApp
 def verify():
     # Parse params from the webhook verification request
     mode = request.args.get("hub.mode")
@@ -77,9 +101,3 @@ def verify():
 @webhook_blueprint.route("/webhook", methods=["GET"])
 def webhook_get():
     return verify()
-
-
-@webhook_blueprint.route("/webhook", methods=["POST"])
-@signature_required
-def webhook_post():
-    return handle_message()
