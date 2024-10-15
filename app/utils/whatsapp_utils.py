@@ -4,8 +4,9 @@ import json
 import requests
 from app.services.openai_service import generate_response
 import re
-from app.utils.db_utils import save_user_info, save_user_preference
 from collections import deque
+import asyncio
+import httpx
 
 
 # A deque to store recently processed message IDs
@@ -31,7 +32,8 @@ def get_text_message_input(recipient, text):
     )
 
 
-def send_message(data):
+
+async def send_message(data):
     headers = {
         "Content-type": "application/json",
         "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
@@ -39,20 +41,20 @@ def send_message(data):
 
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
 
-    try:
-        response = requests.post(
-            url, data=data, headers=headers, timeout=10
-        )
-        response.raise_for_status()
-    except requests.Timeout:
-        logging.error("Timeout occurred while sending message")
-        return jsonify({"status": "error", "message": "Request timed out"}), 408
-    except requests.RequestException as e:
-        logging.error(f"Request failed due to: {e}")
-        return jsonify({"status": "error", "message": "Failed to send message"}), 500
-    else:
-        log_http_response(response)
-        return response
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, json=data, headers=headers, timeout=10)
+            response.raise_for_status()
+        except httpx.TimeoutException:
+            logging.error("Timeout occurred while sending message")
+            return {"status": "error", "message": "Request timed out"}, 408
+        except httpx.RequestError as e:
+            logging.error(f"Request failed due to: {e}")
+            return {"status": "error", "message": "Failed to send message"}, 500
+        else:
+            log_http_response(response)
+            return response.json()  # Return the JSON response content
+
 
 
 def process_text_for_whatsapp(text):
@@ -64,11 +66,11 @@ def process_text_for_whatsapp(text):
     return whatsapp_style_text
 
 
-# Modify your process_whatsapp_message function
-def process_whatsapp_message(body):
+# process_whatsapp_message function
+async def process_whatsapp_message(body):
     message_id = body["entry"][0]["changes"][0]["value"]["messages"][0]["id"]
-    
-     # Check if the message has already been processed
+
+    # Check if the message has already been processed
     if is_message_processed(message_id):
         logging.info(f"Message {message_id} already processed. Skipping.")
         return
@@ -95,13 +97,15 @@ def process_whatsapp_message(body):
     else:
         message_body = "I can handle text messages and locations. Please send either of those."
 
-    # Generate response using OpenAI
-    response = generate_response(message_body, wa_id, name)
+    # Generate response using OpenAI (await this since it's time-consuming)
+    response = await generate_response(message_body, wa_id, name)
 
     # Process and send the response as before
     response = process_text_for_whatsapp(response)
+
+    # Asynchronously prepare and send the message
     data = get_text_message_input(wa_id, response)
-    send_message(data)
+    await send_message(data)
     
     
 
@@ -147,9 +151,7 @@ def is_valid_whatsapp_message(body):
 
 
 def is_message_processed(message_id):
-    with shelve.open("data/processed_messages_db") as processed_shelf:
-        return processed_shelf.get(message_id, False)
+        return  processed_messages.get(message_id, False)
 
 def mark_message_as_processed(message_id):
-    with shelve.open("data/processed_messages_db", writeback=True) as processed_shelf:
-        processed_shelf[message_id] = True
+    processed_messages[message_id] = True

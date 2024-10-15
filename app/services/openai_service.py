@@ -49,10 +49,10 @@ def run_assistant(thread, name):
     return new_message
 
 
-def generate_response(message_body, wa_id, name):
-    thread = get_or_create_thread(wa_id)
-    message = client.beta.threads.messages.create(thread_id=thread.id, role="user", content=message_body)
-    new_message = run_assistant(thread, name)
+async def generate_response(message_body, wa_id, name):
+    thread = await get_or_create_thread(wa_id)  # Make sure this function is also async
+    message = await client.beta.threads.messages.create(thread_id=thread.id, role="user", content=message_body)
+    new_message = await run_assistant(thread, name)  # Ensure this is also async
     return new_message
 
 

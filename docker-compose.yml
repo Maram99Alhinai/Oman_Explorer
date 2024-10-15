@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   web:
     build: .
@@ -6,35 +8,22 @@ services:
     environment:
       - FLASK_APP=main.py
       - FLASK_ENV=production
-      - DB_HOST=127.0.0.1
-      - DB_PORT=3307
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/google-credentials.json  
     volumes:
       - ./data:/app/data
       - ./credentials:/app/credentials:ro  
-    networks:
-      - backend
-    depends_on:
-      - cloud_sql_proxy
     restart: unless-stopped
+    command: >
+      sh -c "
+        if [ -n "$NGROK_AUTHTOKEN" ]; then
+          ngrok config add-authtoken "$NGROK_AUTHTOKEN" &&
+          ngrok http 8080 --domain=adapting-moccasin-vastly.ngrok-free.app &
+        else
+          echo 'Warning: NGROK_AUTHTOKEN not set. Skipping ngrok setup.'
+        fi &&
+        gunicorn --workers 4 --worker-class gevent --bind 0.0.0.0:8080 main:app
+      "
 
-  cloud_sql_proxy:
-    image: gcr.io/cloudsql-docker/gce-proxy:1.28.1
-    container_name: cloud_sql_proxy
-    command: 
-      - "/cloud_sql_proxy"
-      - "--instances=sohail-437105:europe-west3:sohail-ocv1=tcp:0.0.0.0:3307"
-    ports:
-      - "3307:3307"
-    volumes:
-      - ./credentials/google-credentials.json:/app/config/google-credentials.json:ro
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/google-credentials.json
-    networks:
-      - backend
-    restart: unless-stopped
-
-networks:
-  backend:
-    driver: bridge
+volumes:
+  data:

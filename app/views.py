@@ -4,7 +4,7 @@ import threading
 from flask import Blueprint, request, jsonify, current_app
 from .decorators.security import signature_required
 from .utils.whatsapp_utils import (process_whatsapp_message, is_valid_whatsapp_message)
-
+import asyncio
 
 webhook_blueprint = Blueprint("webhook", __name__)
 
@@ -37,7 +37,7 @@ def handle_message():
 
     try:
         if is_valid_whatsapp_message(body):
-            process_whatsapp_message(body)
+            asyncio.run_coroutine_threadsafe(process_whatsapp_message(body), asyncio.get_event_loop())
             return jsonify({"status": "ok"}), 200
         else:
             # if the request is not a WhatsApp API event, return an error
