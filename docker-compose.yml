@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   web:
@@ -9,6 +8,10 @@ services:
       - FLASK_APP=main.py
       - FLASK_ENV=production
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PHONE_NUMBER_ID=${PHONE_NUMBER_ID}
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
+      - VERSION=${VERSION}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/google-credentials.json  
     volumes:
       - ./data:/app/data

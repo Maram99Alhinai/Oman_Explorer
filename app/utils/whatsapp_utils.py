@@ -1,61 +1,56 @@
 import logging
 from flask import current_app, jsonify
 import json
-import requests
+import aiohttp
 from app.services.openai_service import generate_response
 import re
 from collections import deque
 import asyncio
-import httpx
-
 
 # A deque to store recently processed message IDs
-processed_messages = deque(maxlen=100)  
+processed_messages = deque(maxlen=100)
 
-
-
-def log_http_response(response):
-    logging.info(f"Status: {response.status_code}")
+async def log_http_response(response):
+    logging.info(f"Status: {response.status}")
     logging.info(f"Content-type: {response.headers.get('content-type')}")
-    logging.info(f"Body: {response.text}")
-
+    text = await response.text()
+    logging.info(f"Body: {text}")
 
 def get_text_message_input(recipient, text):
-    return json.dumps(
-        {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": recipient,
-            "type": "text",
-            "text": {"preview_url": False, "body": text},
-        }
-    )
-
-
+    return {
+        "to": recipient,
+        "text": text,
+    }
 
 async def send_message(data):
     headers = {
         "Content-type": "application/json",
         "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
     }
-
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
 
-    async with httpx.AsyncClient() as client:
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": data["to"],  # Correctly assigning the recipient
+        "type": "text",    # Message type
+        "text": {
+            "body": data["text"],  # Correctly using 'body' for message content
+        },
+        "messaging_type": "RESPONSE",  # Specify the messaging type
+    }
+    async with aiohttp.ClientSession() as session:
         try:
-            response = await client.post(url, json=data, headers=headers, timeout=10)
-            response.raise_for_status()
-        except httpx.TimeoutException:
+            async with session.post(url, json=payload, headers=headers, timeout=10) as response:
+                await log_http_response(response)
+                response.raise_for_status()
+                return await response.json()
+        except asyncio.TimeoutError:
             logging.error("Timeout occurred while sending message")
             return {"status": "error", "message": "Request timed out"}, 408
-        except httpx.RequestError as e:
+        except aiohttp.ClientError as e:
             logging.error(f"Request failed due to: {e}")
             return {"status": "error", "message": "Failed to send message"}, 500
-        else:
-            log_http_response(response)
-            return response.json()  # Return the JSON response content
-
-
+        
 
 def process_text_for_whatsapp(text):
     pattern = r"\【.*?\】"
@@ -65,28 +60,19 @@ def process_text_for_whatsapp(text):
     whatsapp_style_text = re.sub(pattern, replacement, text)
     return whatsapp_style_text
 
-
-# process_whatsapp_message function
 async def process_whatsapp_message(body):
     message_id = body["entry"][0]["changes"][0]["value"]["messages"][0]["id"]
 
-    # Check if the message has already been processed
-    if is_message_processed(message_id):
+    if message_id in processed_messages:
         logging.info(f"Message {message_id} already processed. Skipping.")
         return
 
-    # Mark the message as processed
-    mark_message_as_processed(message_id)
-
-    # Add the message ID to the deque
     processed_messages.append(message_id)
 
-    # Process the message (as before)
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
     name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
 
-    # Handle message types (text, location, etc.)
     if "location" in message:
         location = message["location"]
         message_body = f"""موقعي الحالي هو:
@@ -97,47 +83,13 @@ async def process_whatsapp_message(body):
     else:
         message_body = "I can handle text messages and locations. Please send either of those."
 
-    # Generate response using OpenAI (await this since it's time-consuming)
     response = await generate_response(message_body, wa_id, name)
-
-    # Process and send the response as before
     response = process_text_for_whatsapp(response)
 
-    # Asynchronously prepare and send the message
     data = get_text_message_input(wa_id, response)
     await send_message(data)
-    
-    
-
-def extract_user_data(response):
-    # Implement logic to extract user information and preferences from the AI response
-    # This is a placeholder implementation. You'll need to adjust this based on your AI's output format.
-    user_info = {}
-    preferences = []
-    
-    # Example parsing (adjust according to your AI's output structure):
-    lines = response.split('\n')
-    for line in lines:
-        if line.startswith("User Info:"):
-            # Parse user info
-            info = line.split(':')[1].strip().split(',')
-            for item in info:
-                key, value = item.split('=')
-                user_info[key.strip()] = value.strip()
-        elif line.startswith("Preference:"):
-            # Parse preference
-            pref = line.split(':')[1].strip().split(',')
-            preference = {}
-            for item in pref:
-                key, value = item.split('=')
-                preference[key.strip()] = value.strip()
-            preferences.append(preference)
-    
-    return user_info, preferences
-
 
 def is_valid_whatsapp_message(body):
-    """Extended validation to include location messages"""
     if not (body.get("object") and body.get("entry") and 
             body["entry"][0].get("changes") and 
             body["entry"][0]["changes"][0].get("value") and 
@@ -146,12 +98,4 @@ def is_valid_whatsapp_message(body):
         return False
         
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    # Check if it's a text or location message
     return "text" in message or "location" in message
-
-
-def is_message_processed(message_id):
-        return  processed_messages.get(message_id, False)
-
-def mark_message_as_processed(message_id):
-    processed_messages[message_id] = True
